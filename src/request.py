@@ -1,43 +1,54 @@
-import requests
 import os
 from dotenv import load_dotenv
 
-url = "https://api.akahu.io/v1/transactions"
+from textual.app import App, ComposeResult
+from textual.widgets import Static, SelectionList
 
-load_dotenv()
-appToken = os.getenv("APP_TOKEN")
-token = os.getenv("TOKEN")
+from apihandler import ApiHandler
 
-# Define the headers dictionary
-headers = {
-    "Authorization": f"Bearer {token}",
-    "X-Akahu-Id": appToken,
-    "Content-Type": "application/json"
-}
 
-params = {
-    "start": "2026-05-07T23:59:59.999+13:00",
-    "end": "2026-05-14T23:59:59.999+13:00"
-}
+class FinanceApp(App):
 
-# Pass the headers into the GET request
-response = requests.get(url, headers=headers, params=params)
-print(response)
-data = response.json()
+    def compose(self) -> ComposeResult:
+        yield SelectionList[str](id="accounts")
+        yield Static("Loading accounts...", id="output")
 
-for tx in data["items"]:
-    print("-" * 60)
-    print(f"Date:        {tx['date']}")
-    print(f"Description: {tx['description']}")
-    print(f"Amount:      ${tx['amount']}")
-    print(f"Balance:     ${tx['balance']}")
-    print(f"Type:        {tx['type']}")
+    async def on_mount(self) -> None:
 
-    if "merchant" in tx:
-        print(f"Merchant:    {tx['merchant']['name']}")
+        load_dotenv()
 
-    if "category" in tx:
-        print(f"Category:    {tx['category']['name']}")
+        self.api = ApiHandler(
+            os.getenv("TOKEN"),
+            os.getenv("APP_TOKEN")
+        )
 
-    if "meta" in tx:
-        print(f"Meta:        {tx['meta']}")
+        output = self.query_one("#output", Static)
+        account_list = self.query_one("#accounts", SelectionList)
+
+        try:
+            accounts = await self.api.getAccountList()
+            items = accounts.get("items", [])
+
+            account_list.clear_options()
+
+            for account in items:
+                name = account.get("name", "Unnamed Account")
+                acc_id = account.get("_id", "")
+
+                account_list.add_option((name, acc_id))
+
+            output.update(f"Loaded {len(items)} accounts")
+
+        except Exception as e:
+            output.update(f"ERROR:\n{e}")
+
+    def on_selection_list_selection_changed(self, event: SelectionList.SelectionChanged) -> None:
+        output = self.query_one("#output", Static)
+        output.update(f"Selected: {event.selection}")
+
+    async def on_unmount(self) -> None:
+        await self.api.close()
+
+
+if __name__ == "__main__":
+    FinanceApp().run()
