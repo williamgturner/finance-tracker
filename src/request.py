@@ -2,16 +2,42 @@ import os
 from dotenv import load_dotenv
 
 from textual.app import App, ComposeResult
-from textual.widgets import Static, SelectionList
+from textual.binding import Binding
+from textual.widgets import Static, SelectionList, Footer
+from graph_view import GraphView
 
 from apihandler import ApiHandler
 
 
 class FinanceApp(App):
 
+    BINDINGS = [
+        
+        Binding(key="q", action="quit", description="Quit the app"),
+                
+        Binding(
+                    
+        key="question_mark",
+                    
+        action="help",
+                    
+        description="Show help screen",
+                    
+        key_display="?",
+                
+        ),
+                
+        Binding(key="delete", action="delete", description="Delete the thing"),
+                
+        Binding(key="j", action="down", description="Scroll down", show=False),
+            
+    ]
+
     def compose(self) -> ComposeResult:
         yield SelectionList[str](id="accounts")
         yield Static("Loading accounts...", id="output")
+        yield GraphView("test")
+        yield Footer()
 
     async def on_mount(self) -> None:
 
