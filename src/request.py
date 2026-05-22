@@ -1,79 +1,37 @@
 import os
+from textual import on
+from textual.events import Mount
 from dotenv import load_dotenv
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Static, SelectionList, Footer
-from graph_view import GraphView
 
+from graph_view import GraphView
 from apihandler import ApiHandler
 
 
 class FinanceApp(App):
 
-    BINDINGS = [
-        
-        Binding(key="q", action="quit", description="Quit the app"),
-                
-        Binding(
-                    
-        key="question_mark",
-                    
-        action="help",
-                    
-        description="Show help screen",
-                    
-        key_display="?",
-                
-        ),
-                
-        Binding(key="delete", action="delete", description="Delete the thing"),
-                
-        Binding(key="j", action="down", description="Scroll down", show=False),
-            
-    ]
-
     def compose(self) -> ComposeResult:
-        yield SelectionList[str](id="accounts")
-        yield Static("Loading accounts...", id="output")
-        yield GraphView("test")
-        yield Footer()
+        yield GraphView()
+        yield SelectionList()
+
+    @on(SelectionList.SelectedChanged)
+    async def update_selected_view(self) -> None:
+        net_balance_series = await self.api.getAccountTransactions(self.query_one(SelectionList).selected)
+        self.query_one(GraphView).data=net_balance_series
 
     async def on_mount(self) -> None:
-
         load_dotenv()
-
         self.api = ApiHandler(
             os.getenv("TOKEN"),
             os.getenv("APP_TOKEN")
         )
+        accountList=self.query_one(SelectionList)
+        for account in await self.api.getAccountList():
+            accountList.add_option((account[0], account[1]))
 
-        output = self.query_one("#output", Static)
-        account_list = self.query_one("#accounts", SelectionList)
-
-        try:
-            accounts = await self.api.getAccountList()
-            items = accounts.get("items", [])
-
-            account_list.clear_options()
-
-            for account in items:
-                name = account.get("name", "Unnamed Account")
-                acc_id = account.get("_id", "")
-
-                account_list.add_option((name, acc_id))
-
-            output.update(f"Loaded {len(items)} accounts")
-
-        except Exception as e:
-            output.update(f"ERROR:\n{e}")
-
-    def on_selection_list_selection_changed(self, event: SelectionList.SelectionChanged) -> None:
-        output = self.query_one("#output", Static)
-        output.update(f"Selected: {event.selection}")
-
-    async def on_unmount(self) -> None:
-        await self.api.close()
 
 
 if __name__ == "__main__":

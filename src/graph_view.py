@@ -1,14 +1,23 @@
-from textual.app import App, ComposeResult, RenderResult
+from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Label, Input
+from textual_plotext import PlotextPlot
+from textual.reactive import reactive
 
 
 class GraphView(Widget):
 
-    def __init__(self, input_label: str) -> None:
-        self.input_label = input_label
-        super().__init__()
+    data = reactive([("01/01/1999", 0)])
 
     def compose(self) -> ComposeResult:
-        yield Label(self.input_label)
-        yield Input()
+        yield PlotextPlot()
+
+    def watch_data(self, old, new):
+
+        plot = self.query_one(PlotextPlot)
+        plt = plot.plt
+        plt.clear_figure()
+
+        if len(self.data) > 0:
+            x, y = zip(*self.data)
+            plt.plot(x, y)
+        plot.refresh()
